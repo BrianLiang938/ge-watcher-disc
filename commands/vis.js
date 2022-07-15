@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const fetch = require('node-fetch');
-const { MessageAttachment, MessageEmbed } = require('discord.js');
+const { MessageEmbed } = require('discord.js');
+const QuickChart = require('quickchart-js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -17,22 +18,98 @@ module.exports = {
 		const high = [];
 		const low = [];
 		const time = [];
-		for (let i = 0; i < 20; i++) {
+		for (let i = 0; i < 30; i++) {
 			const h = data[size - 1 - i].avgHighPrice;
 			const l = data[size - 1 - i].avgLowPrice;
 			const t = data[size - 1 - i].timestamp;
-
-			high.push(h);
-			low.push(l);
+			high.unshift(h);
+			low.unshift(l);
 			const date = new Date(t * 1000);
-			time.push(date);
+			const hours = date.getHours();
+			const formattedTime = timeProcess(hours);
+			time.unshift(formattedTime);
 		}
-		const title = `Price History for Item ID ${input}`;
-		// https://quickchart.io/chart/render/zm-8142028a-d8c7-4546-88d1-f6b71fac96e2?data1=${low}&data2=${high}&title=${title}&labels=${time}
-		const file = new MessageAttachment('https://quickchart.io/chart/render/zm-8142028a-d8c7-4546-88d1-f6b71fac96e2');
+		const title = `Price History of Item ID ${input}`;
+		const chart = createGraph(low, high, title, time);
+		const chartUrl = chart.getUrl();
+		// https://quickchart.io/chart/render/zm-0bd78cfc-df6e-4d31-b1c1-1fd9d2ef7221?data1=${low}&data2=${high}&title=${title}&labels=${time}
 		const exampleEmbed = new MessageEmbed()
-			.setTitle('Some title')
-			.setImage(`https://quickchart.io/chart/render/zm-8142028a-d8c7-4546-88d1-f6b71fac96e2?data1=${low}&data2=${high}`);
+			.setImage(chartUrl);
 		interaction.channel.send({ embeds: [exampleEmbed] });
 	},
 };
+
+function timeProcess(hours) {
+	let formattedTime = hours + 'AM';
+	if (hours > 12) {
+		hours = hours - 12;
+		formattedTime = hours + 'PM';
+	}
+	else if (hours == 0) {
+		hours = 12;
+		formattedTime = hours + 'AM';
+	}
+	else if (hours == 12) {
+		formattedTime = hours + 'PM';
+	}
+	return formattedTime;
+}
+
+function createGraph(low, high, title, label) {
+	const qc = new QuickChart();
+
+	qc.setConfig({
+		type: 'line',
+		data: {
+			labels: label,
+			datasets: [{
+				label: 'High Price',
+				data: high,
+				fill: false,
+			}, {
+				label: 'Low Price',
+				data: low,
+				fill: false,
+			}],
+		},
+		options: {
+			title: {
+				display: true,
+				text: title,
+			},
+			scales: {
+				grid: {
+					color: 'black',
+					display: true,
+					borderWidth: 2,
+				},
+				x: {
+					type: 'time',
+					time: {
+						unit: 'hour',
+					},
+					title: {
+						display: true,
+						text: 'Time',
+					},
+				},
+				y: {
+					type: 'linear',
+					grace: '5%',
+					min: Math.min(Math.min(...low), Math.min(...high)),
+					max: Math.max(Math.max(...low), Math.max(...high)),
+				},
+				yAxes: {
+					ticks: {
+						// Include a dollar sign in the ticks
+						callback: function(value) {
+							return '$' + value;
+						},
+					},
+				},
+			},
+		},
+	})
+		.setBackgroundColor('rgb(224, 224, 224)');
+	return qc;
+}
