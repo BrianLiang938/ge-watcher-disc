@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const fetch = require('node-fetch');
 const { MessageEmbed } = require('discord.js');
 const QuickChart = require('quickchart-js');
-
+ 
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('vis')
@@ -31,11 +31,26 @@ module.exports = {
 		}
 		const title = `Price History of Item ID ${input}`;
 		const chart = createGraph(low, high, title, time);
-		const chartUrl = chart.getUrl();
+		await fetch('https://quickchart.io/chart/create', {
+			method: 'POST',
+			Headers: {
+				Accept: 'application/json',
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(chart),
+			Cache: 'default',
+		}).then(response => response.json())
+			.then(result => {
+				console.log('Success:', result);
+			})
+			.catch(error => {
+				console.error('Error:', error);
+			});
 		// https://quickchart.io/chart/render/zm-0bd78cfc-df6e-4d31-b1c1-1fd9d2ef7221?data1=${low}&data2=${high}&title=${title}&labels=${time}
-		const exampleEmbed = new MessageEmbed()
-			.setImage(chartUrl);
-		interaction.channel.send({ embeds: [exampleEmbed] });
+		//console.log(response.url);
+		//const exampleEmbed = new MessageEmbed()
+			//.setImage(response.url);
+		//interaction.channel.send({ embeds: [exampleEmbed] });
 	},
 };
 
@@ -56,60 +71,59 @@ function timeProcess(hours) {
 }
 
 function createGraph(low, high, title, label) {
-	const qc = new QuickChart();
-
-	qc.setConfig({
-		type: 'line',
-		data: {
-			labels: label,
-			datasets: [{
-				label: 'High Price',
-				data: high,
-				fill: false,
-			}, {
-				label: 'Low Price',
-				data: low,
-				fill: false,
-			}],
-		},
-		options: {
-			title: {
-				display: true,
-				text: title,
+	return {
+		'backgroundColor': 'rgb(192,192,192)',
+		'chart': JSON.stringify({
+			type: 'line',
+			data: {
+				labels: label,
+				datasets: [{
+					label: 'High Price',
+					data: high,
+					fill: false,
+				}, {
+					label: 'Low Price',
+					data: low,
+					fill: false,
+				}],
 			},
-			scales: {
-				grid: {
-					color: 'black',
+			options: {
+				title: {
 					display: true,
-					borderWidth: 2,
+					text: title,
 				},
-				x: {
-					type: 'time',
-					time: {
-						unit: 'hour',
-					},
-					title: {
+				scales: {
+					grid: {
+						color: 'black',
 						display: true,
-						text: 'Time',
+						borderWidth: 2,
 					},
-				},
-				y: {
-					type: 'linear',
-					grace: '5%',
-					min: Math.min(Math.min(...low), Math.min(...high)),
-					max: Math.max(Math.max(...low), Math.max(...high)),
-				},
-				yAxes: {
-					ticks: {
-						// Include a dollar sign in the ticks
-						callback: function(value) {
-							return '$' + value;
+					x: {
+						type: 'time',
+						time: {
+							unit: 'hour',
+						},
+						title: {
+							display: true,
+							text: 'Time',
+						},
+					},
+					y: {
+						type: 'linear',
+						grace: '5%',
+						min: Math.min(Math.min(...low), Math.min(...high)),
+						max: Math.max(Math.max(...low), Math.max(...high)),
+					},
+					yAxes: {
+						ticks: {
+							// Include a dollar sign in the ticks
+							callback: function(value) {
+								return '$' + value;
+							},
 						},
 					},
 				},
 			},
-		},
-	})
-		.setBackgroundColor('rgb(224, 224, 224)');
-	return qc;
+		}),
+	};
 }
