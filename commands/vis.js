@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const fetch = require('node-fetch');
 const { MessageEmbed } = require('discord.js');
 const QuickChart = require('quickchart-js');
- 
+
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('vis')
@@ -18,7 +18,7 @@ module.exports = {
 		const high = [];
 		const low = [];
 		const time = [];
-		for (let i = 0; i < 30; i++) {
+		for (let i = 0; i < 96; i++) {
 			const h = data[size - 1 - i].avgHighPrice;
 			const l = data[size - 1 - i].avgLowPrice;
 			const t = data[size - 1 - i].timestamp;
@@ -31,26 +31,12 @@ module.exports = {
 		}
 		const title = `Price History of Item ID ${input}`;
 		const chart = createGraph(low, high, title, time);
-		await fetch('https://quickchart.io/chart/create', {
-			method: 'POST',
-			Headers: {
-				Accept: 'application/json',
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify(chart),
-			Cache: 'default',
-		}).then(response => response.json())
-			.then(result => {
-				console.log('Success:', result);
-			})
-			.catch(error => {
-				console.error('Error:', error);
-			});
+		const url = await chart.getShortUrl();
+		console.log(url);
 		// https://quickchart.io/chart/render/zm-0bd78cfc-df6e-4d31-b1c1-1fd9d2ef7221?data1=${low}&data2=${high}&title=${title}&labels=${time}
-		//console.log(response.url);
-		//const exampleEmbed = new MessageEmbed()
-			//.setImage(response.url);
-		//interaction.channel.send({ embeds: [exampleEmbed] });
+		const exampleEmbed = new MessageEmbed()
+			.setImage(url);
+		interaction.channel.send({ embeds: [exampleEmbed] });
 	},
 };
 
@@ -71,59 +57,59 @@ function timeProcess(hours) {
 }
 
 function createGraph(low, high, title, label) {
-	return {
-		'backgroundColor': 'rgb(192,192,192)',
-		'chart': JSON.stringify({
-			type: 'line',
-			data: {
-				labels: label,
-				datasets: [{
-					label: 'High Price',
-					data: high,
-					fill: false,
-				}, {
-					label: 'Low Price',
-					data: low,
-					fill: false,
-				}],
+	const myChart = new QuickChart();
+	myChart.setConfig({
+		type: 'line',
+		data: {
+			labels: label,
+			datasets: [{
+				label: 'High Price',
+				data: high,
+				fill: false,
+			}, {
+				label: 'Low Price',
+				data: low,
+				fill: false,
+			}],
+		},
+		options: {
+			title: {
+				display: true,
+				text: title,
 			},
-			options: {
-				title: {
+			scales: {
+				grid: {
+					color: 'black',
 					display: true,
-					text: title,
+					borderWidth: 2,
 				},
-				scales: {
-					grid: {
-						color: 'black',
+				x: {
+					type: 'time',
+					time: {
+						unit: 'hour',
+					},
+					title: {
 						display: true,
-						borderWidth: 2,
+						text: 'Time',
 					},
-					x: {
-						type: 'time',
-						time: {
-							unit: 'hour',
-						},
-						title: {
-							display: true,
-							text: 'Time',
-						},
-					},
-					y: {
-						type: 'linear',
-						grace: '5%',
-						min: Math.min(Math.min(...low), Math.min(...high)),
-						max: Math.max(Math.max(...low), Math.max(...high)),
-					},
-					yAxes: {
-						ticks: {
-							// Include a dollar sign in the ticks
-							callback: function(value) {
-								return '$' + value;
-							},
+				},
+				y: {
+					type: 'linear',
+					grace: '5%',
+					min: Math.min(Math.min(...low), Math.min(...high)),
+					max: Math.max(Math.max(...low), Math.max(...high)),
+				},
+				yAxes: {
+					ticks: {
+						// Include a dollar sign in the ticks
+						callback: function(value) {
+							return '$' + value;
 						},
 					},
 				},
 			},
-		}),
-	};
+		},
+	});
+	myChart.setBackgroundColor('rgb(192,192,192)').setWidth(800);
+	return myChart;
 }
