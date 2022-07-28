@@ -1,7 +1,12 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const fetch = require('node-fetch');
-const { MessageEmbed } = require('discord.js');
-const QuickChart = require('quickchart-js');
+const { MessageAttachment, MessageEmbed } = require('discord.js');
+const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
+
+const width = 800;
+const height = 600;
+const backgroundColor = 'white';
+
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -17,25 +22,33 @@ module.exports = {
 		const data = json.data;
 		const high = [];
 		const low = [];
+		// const mean = [];
 		const time = [];
-		for (let i = 0; i < 120; i++) {
+		for (let i = 0; i < 80; i++) {
 			const h = data[size - 1 - i].avgHighPrice;
 			const l = data[size - 1 - i].avgLowPrice;
 			const t = data[size - 1 - i].timestamp;
 			high.unshift(h);
 			low.unshift(l);
+			// mean.unshift(data.slice(size - 20 - i, size - 1 - i));
 			const date = new Date(t * 1000);
 			const formattedTime = timeProcess(date);
 			time.unshift(formattedTime);
 		}
 		const title = `Price History of Item ID ${input}`;
-		const chart = createGraph(low, high, title, time);
-		const url = await chart.getShortUrl();
+		const config = createGraph(low, high, title, time);
+		const canvas = new ChartJSNodeCanvas({
+			width,
+			height,
+			backgroundColor,
+		});
+		const image = await canvas.renderToBuffer(config);
 		// https://quickchart.io/chart/render/zm-0bd78cfc-df6e-4d31-b1c1-1fd9d2ef7221?data1=${low}&data2=${high}&title=${title}&labels=${time}
-		const exampleEmbed = new MessageEmbed()
-			.setTitle(`${url}`)
-			.setImage(url);
-		interaction.channel.send({ embeds: [exampleEmbed] });
+		const attachment = new MessageAttachment(image, 'graph.png');
+		const embed = new MessageEmbed()
+			.setTitle('Chart')
+			.setImage('attachment://graph.png');
+		interaction.channel.send({ embeds: [embed], files: [attachment] });
 	},
 };
 
@@ -51,8 +64,7 @@ function timeProcess(date) {
 }
 
 function createGraph(low, high, title, label) {
-	const myChart = new QuickChart();
-	myChart.setConfig({
+	const config = {
 		type: 'line',
 		data: {
 			labels: label,
@@ -83,10 +95,14 @@ function createGraph(low, high, title, label) {
 					borderWidth: 2,
 				},
 				x: {
-					type: 'time',
 					title: {
 						display: true,
 						text: 'Time',
+					},
+					ticks: {
+						autoSkip: false,
+						maxRotation: 90,
+						minRoation: 90,
 					},
 				},
 				y: {
@@ -94,15 +110,6 @@ function createGraph(low, high, title, label) {
 					grace: '5%',
 					min: Math.min(Math.min(...low), Math.min(...high)),
 					max: Math.max(Math.max(...low), Math.max(...high)),
-				},
-				xAxes: [{
-					ticks: {
-						autoSkip: false,
-						maxRotation: 90,
-						minRoation: 90,
-					},
-				}],
-				yAxes: [{
 					ticks: {
 						callback: (val) => {
 							if (val > 1000000) {
@@ -116,10 +123,9 @@ function createGraph(low, high, title, label) {
 							return val.toLocaleString();
 						},
 					},
-				}],
+				},
 			},
 		},
-	});
-	myChart.setBackgroundColor('rgb(192,192,192)').setWidth(1500).setHeight(600);
-	return myChart;
+	};
+	return config;
 }
