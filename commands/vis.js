@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const fetch = require('node-fetch');
 const { MessageAttachment, MessageEmbed } = require('discord.js');
-const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
+const { ChartJSNodeCanvas, ChartCallback } = require('chartjs-node-canvas');
 
 const width = 800;
 const height = 600;
@@ -40,9 +40,9 @@ module.exports = {
 		const canvas = new ChartJSNodeCanvas({
 			width,
 			height,
-			backgroundColor,
 		});
 		const image = await canvas.renderToBuffer(config);
+		console.log(low);
 		// https://quickchart.io/chart/render/zm-0bd78cfc-df6e-4d31-b1c1-1fd9d2ef7221?data1=${low}&data2=${high}&title=${title}&labels=${time}
 		const attachment = new MessageAttachment(image, 'graph.png');
 		const embed = new MessageEmbed()
@@ -64,6 +64,24 @@ function timeProcess(date) {
 }
 
 function createGraph(low, high, title, label) {
+	let minimum = low[0];
+	let maximum = low[0];
+	low.forEach(element => {
+		if (element !== null && minimum > element) {
+			minimum = element;
+		}
+		else if (element !== null && maximum < element) {
+			maximum = element;
+		}
+	});
+	high.forEach(element => {
+		if (element !== null && minimum > element) {
+			minimum = element;
+		}
+		else if (element !== null && maximum < element) {
+			maximum = element;
+		}
+	});
 	const config = {
 		type: 'line',
 		data: {
@@ -89,12 +107,8 @@ function createGraph(low, high, title, label) {
 				text: title,
 			},
 			scales: {
-				grid: {
-					color: 'black',
-					display: true,
-					borderWidth: 2,
-				},
 				x: {
+					display: true,
 					title: {
 						display: true,
 						text: 'Time',
@@ -107,9 +121,10 @@ function createGraph(low, high, title, label) {
 				},
 				y: {
 					type: 'linear',
-					grace: '5%',
-					min: Math.min(Math.min(...low), Math.min(...high)),
-					max: Math.max(Math.max(...low), Math.max(...high)),
+					display: true,
+					grace: '10%',
+					min: minimum,
+					max: maximum,
 					ticks: {
 						callback: (val) => {
 							if (val > 1000000) {
@@ -126,6 +141,16 @@ function createGraph(low, high, title, label) {
 				},
 			},
 		},
+		plugins: [{
+			id: 'background-colour',
+			beforeDraw: (chart) => {
+				const ctx = chart.ctx;
+				ctx.save();
+				ctx.fillStyle = 'gray';
+				ctx.fillRect(0, 0, width, height);
+				ctx.restore();
+			},
+		}],
 	};
 	return config;
 }
