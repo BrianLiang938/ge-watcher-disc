@@ -9,8 +9,12 @@ module.exports = {
 	async execute(interaction) {
 		const input = interaction.options.getString('input');
 		const api_url = `https://prices.runescape.wiki/api/v1/osrs/timeseries?timestep=1h&id=${input}`;
+		const api_name = `https://services.runescape.com/m=itemdb_oldschool/api/catalogue/detail.json?item=${input}`;
 		const request = await fetch(api_url);
+		const nameJson = await fetch(api_name);
 		const json = await request.json();
+		const n = await nameJson.json();
+		const name = n.item.name;
 		const size = Object.keys(json.data).length;
 		const data = json.data;
 		const vals = [];
@@ -50,7 +54,7 @@ module.exports = {
 			avg += high - tax;
 			console.log(high);
 		}
-		avg = avg / count;
-		await interaction.reply('Average price of ID ' + input + ' is ' + avg + '\nMost recent timestamp is ' + time[0]);
+		avg = Math.floor(avg / count);
+		await interaction.reply('Average price of ' + name + ' is ' + avg + '\nMost recent timestamp is ' + time[0]);
 	},
 };

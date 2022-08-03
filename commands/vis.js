@@ -1,11 +1,10 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const fetch = require('node-fetch');
 const { MessageAttachment, MessageEmbed } = require('discord.js');
-const { ChartJSNodeCanvas, ChartCallback } = require('chartjs-node-canvas');
+const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 
 const width = 800;
 const height = 600;
-const backgroundColor = 'white';
 
 
 module.exports = {
@@ -16,37 +15,39 @@ module.exports = {
 	async execute(interaction) {
 		const input = interaction.options.getString('input');
 		const api_url = `https://prices.runescape.wiki/api/v1/osrs/timeseries?timestep=1h&id=${input}`;
+		const api_name = `https://services.runescape.com/m=itemdb_oldschool/api/catalogue/detail.json?item=${input}`;
+		const nameJson = await fetch(api_name);
 		const request = await fetch(api_url);
 		const json = await request.json();
+		const n = await nameJson.json();
+		const name = n.item.name;
 		const size = Object.keys(json.data).length;
 		const data = json.data;
 		const high = [];
 		const low = [];
-		// const mean = [];
 		const time = [];
-		for (let i = 0; i < 80; i++) {
+		for (let i = 0; i < 160; i++) {
 			const h = data[size - 1 - i].avgHighPrice;
 			const l = data[size - 1 - i].avgLowPrice;
 			const t = data[size - 1 - i].timestamp;
 			high.unshift(h);
 			low.unshift(l);
-			// mean.unshift(data.slice(size - 20 - i, size - 1 - i));
 			const date = new Date(t * 1000);
 			const formattedTime = timeProcess(date);
 			time.unshift(formattedTime);
 		}
-		const title = `Price History of Item ID ${input}`;
+		const title = `${name}`;
 		const config = createGraph(low, high, title, time);
 		const canvas = new ChartJSNodeCanvas({
 			width,
 			height,
 		});
 		const image = await canvas.renderToBuffer(config);
-		console.log(low);
 		// https://quickchart.io/chart/render/zm-0bd78cfc-df6e-4d31-b1c1-1fd9d2ef7221?data1=${low}&data2=${high}&title=${title}&labels=${time}
 		const attachment = new MessageAttachment(image, 'graph.png');
 		const embed = new MessageEmbed()
-			.setTitle('Chart')
+			.addFields({ name: 'Approx. Offer Price', value: `${low[0].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`, inline: true })
+			.addFields({ name: 'Approx. Sell Price', value: `${high[0].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`, inline: true })
 			.setImage('attachment://graph.png');
 		interaction.channel.send({ embeds: [embed], files: [attachment] });
 	},
@@ -87,24 +88,28 @@ function createGraph(low, high, title, label) {
 		data: {
 			labels: label,
 			datasets: [{
-				label: 'High Price',
+				label: 'Sell Price',
 				data: high,
 				fill: false,
 				pointRadius: 0,
+				borderColor: 'rgb(255,128,0)',
 			}, {
-				label: 'Low Price',
+				label: 'Offer Price',
 				data: low,
 				fill: false,
 				pointRadius: 0,
+				borderColor: 'rgb(0,204,204)',
 			}],
 		},
 		options: {
 			legend: {
 				display: false,
 			},
-			title: {
-				display: true,
-				text: title,
+			plugins: {
+				title: {
+					display: true,
+					text: title,
+				},
 			},
 			scales: {
 				x: {
@@ -146,7 +151,7 @@ function createGraph(low, high, title, label) {
 			beforeDraw: (chart) => {
 				const ctx = chart.ctx;
 				ctx.save();
-				ctx.fillStyle = 'gray';
+				ctx.fillStyle = 'rgb(224,224,224)';
 				ctx.fillRect(0, 0, width, height);
 				ctx.restore();
 			},
