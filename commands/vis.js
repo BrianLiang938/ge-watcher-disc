@@ -11,10 +11,19 @@ module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('vis')
 		.setDescription('Creates graph image')
-		.addStringOption(option => option.setName('input').setDescription('Enter a string')),
+		.addStringOption(option => option.setName('input').setDescription('Enter a string').setRequired(true))
+		.addStringOption(option =>
+			option.setName('timeframe')
+				.setDescription('Timeframe between each data point')
+				.setRequired(true)
+				.addChoices(
+					{ name: '5m', value: '5m' },
+					{ name: '1h', value: '1h' },
+				)),
 	async execute(interaction) {
 		const input = interaction.options.getString('input');
-		const api_url = `https://prices.runescape.wiki/api/v1/osrs/timeseries?timestep=1h&id=${input}`;
+		const timeframe = interaction.options.getString('timeframe');
+		const api_url = `https://prices.runescape.wiki/api/v1/osrs/timeseries?timestep=${timeframe}&id=${input}`;
 		const api_name = `https://services.runescape.com/m=itemdb_oldschool/api/catalogue/detail.json?item=${input}`;
 		const nameJson = await fetch(api_name);
 		const request = await fetch(api_url);
@@ -33,10 +42,10 @@ module.exports = {
 			high.unshift(h);
 			low.unshift(l);
 			const date = new Date(t * 1000);
-			const formattedTime = timeProcess(date);
+			const formattedTime = timeProcess(date, timeframe);
 			time.unshift(formattedTime);
 		}
-		const title = `${name}`;
+		const title = `${name} (${timeframe})`;
 		const config = createGraph(low, high, title, time);
 		const canvas = new ChartJSNodeCanvas({
 			width,
@@ -53,13 +62,22 @@ module.exports = {
 	},
 };
 
-function timeProcess(date) {
+function timeProcess(date, mode) {
 	let formattedTime = '';
-	const hours = date.getHours();
-	const month = date.getMonth();
-	const day = date.getDate();
-	if (hours == 0) {
-		formattedTime = `${month}/${day}`;
+	if (mode == '1h') {
+		const hours = date.getHours();
+		const month = date.getMonth();
+		const day = date.getDate();
+		if (hours == 0) {
+			formattedTime = `${month}/${day}`;
+		}
+	}
+	if (mode == '5m') {
+		const hour = date.getHours();
+		const minute = date.getMinutes();
+		if (minute == 0) {
+			formattedTime = `${hour}:00`;
+		}
 	}
 	return formattedTime;
 }
